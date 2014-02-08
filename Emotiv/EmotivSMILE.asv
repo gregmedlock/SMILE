@@ -1,6 +1,6 @@
 classdef EmotivSMILE < handle
     %----------
-    %EmotivSMILE
+    % *EmotivEEG*
     %----------
     %queries the EDK library in order to recieve data from the
     %Emotiv EEG headset
@@ -20,7 +20,6 @@ classdef EmotivSMILE < handle
     % LoadRecordedData(self,filename)    
     % % To disconnect and unload the library
     % delete(a)
-    
 
     properties
         sampFreq = 128;                   
