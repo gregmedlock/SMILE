@@ -35,8 +35,8 @@ f = sampFreq / 2 * linspace(0, 1, next2 / 2 + 1);
 for channel = data
     FFT = fft(channel, next2) / len;
     mag = 2 * abs(FFT(1 : next2 / 2 + 1));
-    dB  = 20 * log10(abs(mag)/max(abs(mag)));
-    plot(f, dB), title('Magnitude (dB)'), ylabel('Magnitude'), xlabel('Frequency (Hz)')
+%     dB  = 20 * log10(abs(mag)/max(abs(mag)));
+    plot(f, mag), title('Random Noise'), ylabel('Magnitude'), xlabel('Frequency (Hz)')
     pause()
 end
 
