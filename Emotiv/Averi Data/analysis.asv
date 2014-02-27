@@ -217,8 +217,8 @@ end
 for i = 1 : length(bIndexesSHP)
     fprintf('   %.3f Hz\n', f(bIndexesSHP(i)))
 end
-disp(' ')
-disp('Significant differences between relax and stressed found at the following frequencies:')
+disp()
+disp('Significant differences between happy and sad found at the following frequencies:'
 for i = 1 : length(aIndexesSRP)
     fprintf('   %.3f Hz\n', f(aIndexesSRP(i)))
 end
