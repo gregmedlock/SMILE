@@ -3,22 +3,17 @@ clear all
 clc
 
 % Load data sets
-happy(1) = load('setup1_1_happy.mat');
-happy(2) = load('setup1_2_happy.mat');
-happy(3) = load('setup1_3_happy.mat');
-happy(4) = load('setup1_4_happy.mat');
-sad(1) = load('setup1_1_sad.mat');
-sad(2) = load('setup1_2_sad.mat');
-sad(3) = load('setup1_3_sad.mat');
-sad(4) = load('setup1_4_sad.mat');
-relax(1) = load('setup1_1_relax.mat');
-relax(2) = load('setup1_2_relax.mat');
-relax(3) = load('setup1_3_relax.mat');
-relax(4) = load('setup1_4_relax.mat');
-stressed(1) = load('setup1_1_stressed.mat');
-stressed(2) = load('setup1_2_stressed.mat');
-stressed(3) = load('setup1_3_stressed.mat');
-stressed(4) = load('setup1_4_stressed.mat');
+
+for i = 1:4
+    happytxt = sprintf('setup1_%d_happy.mat', i);
+    sadtxt = sprintf('setup1_%d_sad.mat', i);
+    stressedtxt = sprintf('setup1_%d_stressed.mat', i);
+    relaxtxt = sprintf('setup1_%d_relax.mat', i);
+    happy(i) = load(happytxt);
+    sad(i) = load(sadtxt);
+    stressed(i) = load(stressedtxt);
+    relax(i) = load(relaxtxt);
+end
 
 % Data channels in order
 DataChannelsNames = {

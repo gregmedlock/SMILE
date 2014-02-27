@@ -66,6 +66,9 @@ classdef EmotivSMILE < handle
         tempData = [] % holds the data while it is being read from the library
     end
     
+    properties (Access = private, SetAccess = private) % Ross' data fields
+        
+    end
     methods
         function self = EmotivSMILE()
             self.DataChannels = self.EE_DataChannels_enum; % THIS MAY BE REDUNDANT
@@ -266,6 +269,17 @@ classdef EmotivSMILE < handle
                 % Only update the data once the samples from the most recent read operation have been added
                 self.data = self.tempData;
             end 
+        end
+
+%% Ross Methods        
+        % Run our program. Goes until user stops with ___
+        function self = runSMILE(self)
+            self.Run();
+            while true % Loop must be terminated with [ctrl + C] -- may be altered by making a GUI
+                filename = self.Record(5);
+                self.LoadRecordedData; % field 'data' now stores what we want
+                
+            end
         end
     end
 end
