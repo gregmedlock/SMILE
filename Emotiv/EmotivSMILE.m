@@ -63,7 +63,14 @@ classdef EmotivSMILE < handle
     end
     
     properties (Access = protected)
-        tempData = [] % holds the data while it is being read from the library
+        tempData = [];      % holds the data while it is being read from the library
+        lastFilename = '';
+        emotionFreqs = [0.313 1.313 1.813 1.938 2.063 3.188 3.313 3.688 1.250 2.500 4.313 6.000...
+                        6.500 6.813 7.188 7.813 8.125 8.250 8.625 8.750 8.938 9.375 9.438 9.750...
+                        9.938 10.063 10.188 10.563 10.875 11.750 12.063 12.188 12.563 12.875...
+                        13.625 13.688 13.875 14.313 14.500 15.000 15.563 15.688 17.188 17.37...
+                        2.313 3.938 1.688 4.875 7.125 10.188 10.250 12.813 16.125 17.813 18.000...
+                        ]; % Based off of analysis.m with setup1 (ross) 
     end
     
     methods
@@ -198,6 +205,7 @@ classdef EmotivSMILE < handle
                 pause(self.timerPeriod);
             end
             recordFilename = ['EEGlog',datestr(now,30),'.mat'];
+            self.lastFilename = recordFilename; % saves the last filename so that runSMILE can get it
             save(recordFilename,'recordData');
             disp(['Recording complete. Saved to ',recordFilename]);
         end
@@ -266,6 +274,76 @@ classdef EmotivSMILE < handle
                 % Only update the data once the samples from the most recent read operation have been added
                 self.data = self.tempData;
             end 
+        end
+%% Ross Methods
+        % Run loop to collect and analyze data
+        function [] = runSMILE(self)
+            self.Run()
+            matlabpool local 2
+            self.Record(5);
+            figure()
+            try
+                while true
+                    funcs  = {@Record, @analyzeData};
+                    inputs = {[self, 5], self};
+                    parfor i = 1:2
+                        funcs{i}(inputs{i});
+                    end
+                end
+            catch % loop ends here w/ ctrl-c
+                matlabpool close
+                self.Stop()
+            end
+        end
+        
+        % Analyze data with FFT and look for certain frequencies
+        function [] = analyzeData(self)
+            % load data
+            prevData = load(self.lastFilename);
+            
+            % Channel indexes
+            F3  = 6;
+            AF4 = 17;
+            
+            % time axis
+            samples = size(prevData.recordData, 1);
+            t = 10 / samples : 10 / samples : 10;
+            
+            % Plot raw data
+            chanF3  = prevData.recordData(:, F3);
+            chanAF4 = prevData.recordData(:, AF4);
+            plot(t, chanF3, t, chanAF4), title('Raw Data'), legend('F3', 'AF4')
+            pause(1)
+            
+            % Calculate FFT for each channel we are interested in
+            len   = size(happy(1).recordData, 1);     % Length of signal
+            next2 = 2^nextpow2(len);                  % Next power of 2 from length of y
+            f  = self.sampFreq / 2 * linspace(0, 1, next2 / 2 + 1)';
+            a  = find(f == 8);
+            ab = find(f == 12);
+            b  = find(f == 30);
+            fftF3   = fft(chanF3, next2) / len;
+            fftAF4  = fft(chanAF4, next2) / len;
+            magF3   = 2 * abs(fftF3(1 : next2 / 2 + 1));
+            magAF4  = 2 * abs(fftAF4(1 : next2 / 2 + 1));
+            alphaRQ = magF3(a:ab) ./ magAF4(a:ab);
+            betaRQ  = magF3(ab:b) ./ magAF4(ab:b);
+            plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), title('RQ F3 / AF4'), legend('Alpha', 'Beta')
+            pause(1)
+            
+            % Check for high frequencies
+            for freq = self.emotionFreqs
+                index = find(f == freq);
+                if index < ab
+                    if alphaRQ(index) > 5 % say, 5 for a threshold for now
+                        fprintf('User is experiencing stress/sadness. \n(ALPHA)\nFreq: %.3f\n', freq)
+                    end
+                else
+                    if betaRQ(index) > 5 % say, 5 for a threshold for now
+                        fprintf('User is experiencing stress/sadness. \n(BETA)\nFreq: %.3f\n', freq)
+                    end
+                end
+            end
         end
     end
 end
