@@ -10,3 +10,6 @@ same as Ross
 
 Setup 5
 substitute F3 for F7 (I forgot why)
+
+smile/tension
+temp(t7) eyebrow(Fc5) F7(diy electrode) mid(O1) eyebrow(f3) AF4(diy electrode) temp(F4)
