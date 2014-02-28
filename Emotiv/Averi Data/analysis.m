@@ -56,25 +56,25 @@ figure()
 for i = 1:4
     subplot(2,2,i), plot(t, happy(i).recordData(:, F3), t, happy(i).recordData(:, AF4))
 end
-suptitle('Happy'), legend('F3', 'AF4')
+title('Happy'), legend('F3', 'AF4')
 
 figure()
 for i = 1:4
     subplot(2,2,i), plot(t, sad(i).recordData(:, F3), t, sad(i).recordData(:, AF4))
 end
-suptitle('Sad'), legend('F3', 'AF4')
+title('Sad'), legend('F3', 'AF4')
 
 figure()
 for i = 1:4
     subplot(2,2,i), plot(t, relax(i).recordData(:, F3), t, relax(i).recordData(:, AF4))
 end
-suptitle('Relax'), legend('F3', 'AF4')
+title('Relax'), legend('F3', 'AF4')
 
 figure()
 for i = 1:4
     subplot(2,2,i), plot(t, stressed(i).recordData(:, F3), t, stressed(i).recordData(:, AF4))
 end
-suptitle('Stressed'), legend('F3', 'AF4')
+title('Stressed'), legend('F3', 'AF4')
 
 % Calculate FFT for each channel we are interested in
 sampFreq = 128;
@@ -104,7 +104,7 @@ for i = 1:4
     subplot(2, 4, i), plot(f(a:ab), deciF3(a:ab) ./ deciAF4(a:ab), f(a:ab), happyRQ{2*i-1})
     subplot(2, 4, i + 4), plot(f(ab:b), deciF3(ab:b) ./ deciAF4(ab:b), f(ab:b), happyRQ{2*i})
 end
-suptitle('Happy (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
+title('Happy (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
 
 figure()
 for i = 1:4 
@@ -121,7 +121,7 @@ for i = 1:4
     subplot(2, 4, i), plot(f(a:ab), deciF3(a:ab) ./ deciAF4(a:ab), f(a:ab), sadRQ{2*i-1})
     subplot(2, 4, i + 4), plot(f(ab:b), deciF3(ab:b) ./ deciAF4(ab:b), f(ab:b), sadRQ{2*i})
 end
-suptitle('Sad (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
+title('Sad (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
 
 figure()
 for i = 1:4 
@@ -138,7 +138,7 @@ for i = 1:4
     subplot(2, 4, i), plot(f(a:ab), deciF3(a:ab) ./ deciAF4(a:ab), f(a:ab), relaxRQ{2*i-1})
     subplot(2, 4, i + 4), plot(f(ab:b), deciF3(ab:b) ./ deciAF4(ab:b), f(ab:b), relaxRQ{2*i})
 end
-suptitle('Relax (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
+title('Relax (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
 
 figure()
 for i = 1:4 
@@ -155,7 +155,7 @@ for i = 1:4
     subplot(2, 4, i), plot(f(a:ab), deciF3(a:ab) ./ deciAF4(a:ab), f(a:ab), stressedRQ{2*i-1})
     subplot(2, 4, i + 4), plot(f(ab:b), deciF3(ab:b) ./ deciAF4(ab:b), f(ab:b), stressedRQ{2*i})
 end
-suptitle('Stressed (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
+title('Stressed (F3 / AF3)'), legend('RQ Decibel', 'RQ Linear')
 
 %%
 % Find mean of frequencies for each emotion
