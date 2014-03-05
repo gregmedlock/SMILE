@@ -29,7 +29,6 @@ classdef EmotivSMILE < handle
         timerPeriod = 0.35; %seconds *MUST BE LESS THAN acqisitionSeconds. Also used for updating the record data
         plotTimerPeriod = 0.5;
         fig_h;
-        showDebug = false;
     end
     
     properties (Constant)
@@ -45,8 +44,8 @@ classdef EmotivSMILE < handle
         dataRowCount
         hData % handles (pointer) to the data stored in library
         DataChannels
-%         EE_DataChannels_enum = struct('ED_COUNTER',0,'ED_INTERPOLATED',1,'ED_RAW_CQ',2,'ED_AF3',3,'ED_F7',4,'ED_F3',5,'ED_FC5',6,'ED_T7',7,'ED_P7',8,'ED_O1',9,'ED_O2',10,'ED_P8',11,'ED_T8',12,'ED_FC6',13,'ED_F4',14,'ED_F8',15,'ED_AF4',16,'ED_GYROX',17,'ED_GYROY',18,'ED_TIMESTAMP',19,'ED_ES_TIMESTAMP',20,'ED_FUNC_ID',21,'ED_FUNC_VALUE',22,'ED_MARKER',23,'ED_SYNC_SIGNAL',24);
-        EE_DataChannels_enum = struct('ED_COUNTER',0,'ED_AF3',1,'ED_F7',2,'ED_F3',3,'ED_FC5',4,'ED_FC6',5,'ED_F4',6,'ED_F8',7,'ED_AF4',8,'ED_TIMESTAMP',9,'ED_ES_TIMESTAMP',10);
+        EE_DataChannels_enum = struct('ED_COUNTER',0,'ED_INTERPOLATED',1,'ED_RAW_CQ',2,'ED_AF3',3,'ED_F7',4,'ED_F3',5,'ED_FC5',6,'ED_T7',7,'ED_P7',8,'ED_O1',9,'ED_O2',10,'ED_P8',11,'ED_T8',12,'ED_FC6',13,'ED_F4',14,'ED_F8',15,'ED_AF4',16,'ED_GYROX',17,'ED_GYROY',18,'ED_TIMESTAMP',19,'ED_ES_TIMESTAMP',20,'ED_FUNC_ID',21,'ED_FUNC_VALUE',22,'ED_MARKER',23,'ED_SYNC_SIGNAL',24);
+%         EE_DataChannels_enum = struct('ED_COUNTER',0,'ED_AF3',1,'ED_F7',2,'ED_F3',3,'ED_FC5',4,'ED_FC6',5,'ED_F4',6,'ED_F8',7,'ED_AF4',8,'ED_TIMESTAMP',9,'ED_ES_TIMESTAMP',10);
         EE_CognitivTrainingControl_enum = struct('COG_NONE',0,'COG_START',1,'COG_ACCEPT',2,'COG_REJECT',3,'COG_ERASE',4,'COG_RESET',5);
         EE_ExpressivAlgo_enum = struct('EXP_NEUTRAL',1,'EXP_BLINK',2,'EXP_WINK_LEFT',4,'EXP_WINK_RIGHT',8,'EXP_HORIEYE',16,'EXP_EYEBROW',32,'EXP_FURROW',64,'EXP_SMILE',128,'EXP_CLENCH',256,'EXP_LAUGH',512,'EXP_SMIRK_LEFT',1024,'EXP_SMIRK_RIGHT',2048);
         EE_ExpressivTrainingControl_enum = struct('EXP_NONE',0,'EXP_START',1,'EXP_ACCEPT',2,'EXP_REJECT',3,'EXP_ERASE',4,'EXP_RESET',5);
@@ -58,23 +57,26 @@ classdef EmotivSMILE < handle
         EE_InputChannels_enum=struct('EE_CHAN_CMS',0,'EE_CHAN_DRL',1,'EE_CHAN_FP1',2,'EE_CHAN_AF3',3,'EE_CHAN_F7',4,'EE_CHAN_F3',5,'EE_CHAN_FC5',6,'EE_CHAN_T7',7,'EE_CHAN_P7',8,'EE_CHAN_O1',9,'EE_CHAN_O2',10,'EE_CHAN_P8',11,'EE_CHAN_T8',12,'EE_CHAN_FC6',13,'EE_CHAN_F4',14,'EE_CHAN_F8',15,'EE_CHAN_AF4',16,'EE_CHAN_FP2',17);
         EE_ExpressivSignature_enum=struct('EXP_SIG_UNIVERSAL',0,'EXP_SIG_TRAINED',1);
         EE_Event_enum=struct('EE_UnknownEvent',0,'EE_EmulatorError',1,'EE_ReservedEvent',2,'EE_UserAdded',16,'EE_UserRemoved',32,'EE_EmoStateUpdated',64,'EE_ProfileEvent',128,'EE_CognitivEvent',256,'EE_ExpressivEvent',512,'EE_InternalStateChanged',1024,'EE_AllEvent',2032);
-%         DataChannelsNames = {'ED_COUNTER','ED_INTERPOLATED','ED_RAW_CQ','ED_AF3','ED_F7','ED_F3','ED_FC5','ED_T7','ED_P7','ED_O1','ED_O2','ED_P8','ED_T8','ED_FC6','ED_F4','ED_F8','ED_AF4','ED_GYROX','ED_GYROY','ED_TIMESTAMP','ED_ES_TIMESTAMP','ED_FUNC_ID','ED_FUNC_VALUE','ED_MARKER','ED_SYNC_SIGNAL'};
-        DataChannelsNames = {'ED_COUNTER','ED_AF3','ED_F7','ED_F3','ED_FC5','ED_FC6','ED_F4','ED_F8','ED_AF4','ED_TIMESTAMP','ED_ES_TIMESTAMP'};
+        DataChannelsNames = {'ED_COUNTER','ED_INTERPOLATED','ED_RAW_CQ','ED_AF3','ED_F7','ED_F3','ED_FC5','ED_T7','ED_P7','ED_O1','ED_O2','ED_P8','ED_T8','ED_FC6','ED_F4','ED_F8','ED_AF4','ED_GYROX','ED_GYROY','ED_TIMESTAMP','ED_ES_TIMESTAMP','ED_FUNC_ID','ED_FUNC_VALUE','ED_MARKER','ED_SYNC_SIGNAL'};
+%         DataChannelsNames = {'ED_COUNTER','ED_AF3','ED_F7','ED_F3','ED_FC5','ED_FC6','ED_F4','ED_F8','ED_AF4','ED_TIMESTAMP','ED_ES_TIMESTAMP'};
     end
     
-    properties (Access = protected)
-        tempData = [];      % holds the data while it is being read from the library
-        lastFilename = '';
-        emotionFreqs = [0.313 1.313 1.813 1.938 2.063 3.188 3.313 3.688 1.250 2.500 4.313 6.000...
-                        6.500 6.813 7.188 7.813 8.125 8.250 8.625 8.750 8.938 9.375 9.438 9.750...
-                        9.938 10.063 10.188 10.563 10.875 11.750 12.063 12.188 12.563 12.875...
-                        13.625 13.688 13.875 14.313 14.500 15.000 15.563 15.688 17.188 17.37...
-                        2.313 3.938 1.688 4.875 7.125 10.188 10.250 12.813 16.125 17.813 18.000...
-                        ]; % Based off of analysis.m with setup1 (ross) 
+    properties (Access = private)
+        tempData;      % holds the data while it is being read from the library
+        showDebug;
+        arousal;
+        valuence;
+        emotionFreqs = [167, 193, 157, 208, 244, 293, 294, 335, 388, 415,... 
+            418, 135, 151, 159, 161, 163, 181, 183, 189, 150, 170, 199,...
+            226, 234, 239, 245, 255, 260, 262, 268, 270, 273, 280, 281,...
+            286, 289, 291, 293, 299, 304, 318, 323, 325, 331, 336, 348,...
+            349, 352, 359, 362, 370, 379, 381, 405, 408]; % Based off of analysis.m with setup1 (ross) 
     end
     
     methods
-        function self = EmotivSMILE()
+        function self = EmotivSMILE(showDebug)
+            validateattributes(showDebug, {'logical'}, {}, mfilename, 'showDebug', 1)
+            self.showDebug = showDebug;
             self.DataChannels = self.EE_DataChannels_enum; % THIS MAY BE REDUNDANT
             self.channelCount = length(self.DataChannelsNames);
             
@@ -102,8 +104,7 @@ classdef EmotivSMILE < handle
 
             self.dataRowCount = self.acqisitionSeconds * self.sampFreq;
             self.data = zeros(self.dataRowCount,self.channelCount);
-            self.tempData = self.data; % requierd to work on the data variable but still allow external access to data            
-            pause(1);
+            self.tempData = self.data; % requierd to work on the data variable but still allow external access to data
         end
         
 %% delete        
@@ -121,7 +122,7 @@ classdef EmotivSMILE < handle
         end
 
 %% Run
-% Start a timer to continuously update the state of the data variable every timerPeriod
+% Start a timer to continuously update the state of the data variable every /c imerPeriod
         function Run(self)
             self.runAsyncTimer = timer('TimerFcn', @(src,event)UpdateData(self), 'name', 'RunAsync','Period', self.timerPeriod,'BusyMode','drop','ExecutionMode','fixedDelay');
             start(self.runAsyncTimer); 
@@ -205,7 +206,6 @@ classdef EmotivSMILE < handle
                 pause(self.timerPeriod);
             end
             recordFilename = ['EEGlog',datestr(now,30),'.mat'];
-            self.lastFilename = recordFilename; % saves the last filename so that runSMILE can get it
             save(recordFilename,'recordData');
             disp(['Recording complete. Saved to ',recordFilename]);
         end
@@ -238,7 +238,7 @@ classdef EmotivSMILE < handle
                 userID_value = get(userID,'value');
                 calllib('edk','EE_DataAcquisitionEnable',userID_value,true);
             end
-
+% 
             calllib('edk','EE_DataUpdateHandle', 0, self.hData);
             nSamples = libpointer('uint32Ptr',0);
             calllib('edk','EE_DataGetNumberOfSample', self.hData, nSamples);
@@ -275,31 +275,29 @@ classdef EmotivSMILE < handle
                 self.data = self.tempData;
             end 
         end
-%% Ross Methods
+%% Our Methods
         % Run loop to collect and analyze data
-        function [] = runSMILE(self)
-            self.Run()
-            matlabpool local 2
-            self.Record(5);
-            figure()
-            try
-                while true
-                    funcs  = {@Record, @analyzeData};
-                    inputs = {[self, 5], self};
-                    parfor i = 1:2
-                        funcs{i}(inputs{i});
-                    end
-                end
-            catch % loop ends here w/ ctrl-c
-                matlabpool close
-                self.Stop()
+        function [result] = runSMILE(self)
+%             matlabpool local 2
+%             spmd
+%                 [notfound,warnings] = loadlibrary('edk.dll','edk.h');                 %#ok<NASGU,ASGLU>
+%                 disp('EDK library loaded');
+%             end
+            result = [];
+            i = 1;
+            while i<10
+                lastFilename = self.Record(10);
+                result(i) = self.analyzeData(lastFilename);
+                i = i + 1;
             end
+            
+            
         end
         
         % Analyze data with FFT and look for certain frequencies
-        function [] = analyzeData(self)
+        function [result] = analyzeData(self, lastFilename)
             % load data
-            prevData = load(self.lastFilename);
+            prevData = load(lastFilename);
             
             % Channel indexes
             F3  = 6;
@@ -309,38 +307,78 @@ classdef EmotivSMILE < handle
             samples = size(prevData.recordData, 1);
             t = 10 / samples : 10 / samples : 10;
             
-            % Plot raw data
+            % Extract channel vectors
             chanF3  = prevData.recordData(:, F3);
             chanAF4 = prevData.recordData(:, AF4);
-            plot(t, chanF3, t, chanAF4), title('Raw Data'), legend('F3', 'AF4')
-            pause(1)
             
-            % Calculate FFT for each channel we are interested in
-            len   = size(happy(1).recordData, 1);     % Length of signal
-            next2 = 2^nextpow2(len);                  % Next power of 2 from length of y
+            % Prepare frequency range of alpha and beta waves
+            len   = size(chanF3, 1);     % Length of signal
+            next2 = 2^nextpow2(len);     % Next power of 2 from length of y
             f  = self.sampFreq / 2 * linspace(0, 1, next2 / 2 + 1)';
             a  = find(f == 8);
             ab = find(f == 12);
             b  = find(f == 30);
+            
+            % Calculate FFT for each channel we are interested in
             fftF3   = fft(chanF3, next2) / len;
             fftAF4  = fft(chanAF4, next2) / len;
             magF3   = 2 * abs(fftF3(1 : next2 / 2 + 1));
             magAF4  = 2 * abs(fftAF4(1 : next2 / 2 + 1));
             alphaRQ = magF3(a:ab) ./ magAF4(a:ab);
             betaRQ  = magF3(ab:b) ./ magAF4(ab:b);
-            plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), title('RQ F3 / AF4'), legend('Alpha', 'Beta')
-            pause(1)
             
+            % Plot raw data on left and magnitude spectrum (happy / sad) on right
+            figure()
+            subplot(1, 2, 1), plot(t, chanF3, t, chanAF4), legend('F3', 'AF4')
+            subplot(1, 2, 2), plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), legend('Alpha', 'Beta')
+            
+            % Valnce and arousal
+            alphaSumF3  = sum(magF3(a:ab));
+            alphaSumAF4 = sum(magAF4(a:ab));
+            betaSumF3  = sum(magF3(ab:b));
+            betaSumAF4 = sum(magAF4(ab:b));
+            arousal = betaSumF3 / alphaSumF3;
+            valence = betaSumAF4 / alphaSumAF4;
+            if (valence >= 5)
+                if (arousal >= 5)
+                    emotion = 'excited/happy';
+                else
+                    emotion = 'angry/afraid';
+                end
+            else
+                if (arousal >= 5)
+                    emotion = 'calm/content';
+                else
+                    emotion = 'sad/depressed';
+                end
+            end
+            disp(emotion)
+            
+            % Plot emotional state
+            img = imread('emotion.png');
+            imagesc([0 10],[0 10], flipdim(img,1));
+            hold on
+            plot(arousal, valence, 'ko', 'MarkerSize', 12);
+            set(gca, 'ydir', 'normal');
+            axis([0 10 0 10]);
+            hold off
+            self.arousal= [self.arousal,aNew];
+            self.valence= [self.valence,vNew];
+            hline = refline([0 5]);
+            set(hline,'Color','r')
+            
+            result = 0; %counter used for # of significant frequencies
             % Check for high frequencies
-            for freq = self.emotionFreqs
-                index = find(f == freq);
+            for index = self.emotionFreqs
                 if index < ab
-                    if alphaRQ(index) > 5 % say, 5 for a threshold for now
-                        fprintf('User is experiencing stress/sadness. \n(ALPHA)\nFreq: %.3f\n', freq)
+                    if alphaRQ(index - a + 1) > 5 % say, 5 for a threshold for now
+                        fprintf('User is experiencing stress/sadness. \n(ALPHA)\nFreq: %.3f\n', f(index))
+                        result = result + 1;
                     end
                 else
-                    if betaRQ(index) > 5 % say, 5 for a threshold for now
-                        fprintf('User is experiencing stress/sadness. \n(BETA)\nFreq: %.3f\n', freq)
+                    if betaRQ(index - ab + 1) > 5 % say, 5 for a threshold for now
+                        fprintf('User is experiencing stress/sadness. \n(BETA)\nFreq: %.3f\n', f(index))
+                        result = result + 1;
                     end
                 end
             end

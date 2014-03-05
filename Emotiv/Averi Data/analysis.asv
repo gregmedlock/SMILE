@@ -225,3 +225,11 @@ for i = 1 : length(bIndexesSRP)
     fprintf('%d, ', bIndexesSRP(i))
 end
 disp(' ')
+
+
+
+% a = 65
+% ab = 97
+% b = 241
+% l(arq) = 33
+% l(brq) = 145
