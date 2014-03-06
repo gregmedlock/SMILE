@@ -64,8 +64,6 @@ classdef EmotivSMILE < handle
     properties (Access = private)
         tempData;      % holds the data while it is being read from the library
         showDebug;
-        arousal;
-        valence;
         emotionFreqs = [167, 193, 157, 208, 244, 293, 294, 335, 388, 415,... 
             418, 135, 151, 159, 161, 163, 181, 183, 189, 150, 170, 199,...
             226, 234, 239, 245, 255, 260, 262, 268, 270, 273, 280, 281,...
@@ -285,14 +283,13 @@ classdef EmotivSMILE < handle
 %             end
             result = [];
             i = 1;
+            figure(1), hold on
             while i<10
                 lastFilename = self.Record(10);
                 result(i) = self.analyzeData(lastFilename);
                 i = i + 1;
             end
-            
-            disp(self.valence)
-            disp(self.arousal)
+            hold off
         end
         
         % Analyze data with FFT and look for certain frequencies
@@ -302,7 +299,7 @@ classdef EmotivSMILE < handle
             
             % Channel indexes
             F3  = 6;
-            AF4 = 17;
+            AF4 = 5; % AF4 - 17, F7 - 5
             
             % time axis
             samples = size(prevData.recordData, 1);
@@ -329,9 +326,8 @@ classdef EmotivSMILE < handle
             betaRQ  = magF3(ab:b) ./ magAF4(ab:b);
             
             % Plot raw data on left and magnitude spectrum (happy / sad) on right
-            figure()
-            subplot(1, 2, 1), plot(t, chanF3, t, chanAF4), legend('F3', 'AF4')
-            subplot(1, 2, 2), plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), legend('Alpha', 'Beta')
+            subplot(1, 3, 1), plot(t, chanF3, t, chanAF4), legend('F3', 'AF4')
+            subplot(1, 3, 2), plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), legend('Alpha', 'Beta')
             
             % Valnce and arousal
             alphaSumF3  = sum(magF3(a:ab));
@@ -357,14 +353,11 @@ classdef EmotivSMILE < handle
             
             % Plot emotional state
             img = imread('emotion.png');
+            subplot(1,3,3), hold on
             imagesc([0 10],[0 10], flipdim(img,1));
-            hold on
-            plot(self.arousal, self.valence, 'ko', arNew, valNew, 'bo', 'MarkerSize', 12);
+            plot(arNew, valNew, 'bo', 'MarkerSize', 12);
             set(gca, 'ydir', 'normal');
             axis([0 10 0 10]);
-            hold off
-            self.arousal= [self.arousal, aNew];
-            self.valence= [self.valence, vNew];
             hline = refline([0 5]);
             set(hline,'Color','r')
             
