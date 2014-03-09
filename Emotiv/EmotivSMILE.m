@@ -302,7 +302,7 @@ classdef EmotivSMILE < handle
             
             % Channel indexes
             F3  = 6;
-            AF4 = 5; % AF4 - 17, F7 - 5
+            AF4 = 5; % AF4 - 17, F7 - 5, F3-6, 01-10,
             
             % time axis
             samples = size(prevData.recordData, 1);
@@ -339,20 +339,20 @@ classdef EmotivSMILE < handle
             betaSumAF4 = sum(magAF4(ab:b));
             arNew  = betaSumF3 / alphaSumF3;
             valNew = betaSumAF4 / alphaSumAF4;
-            if (valNew >= 5)
-                if (arNew >= 5)
+            if (valNew >= 2.3)
+                if (arNew >= 2.3)
                     emotion = 'excited/happy';
                 else
                     emotion = 'angry/afraid';
                 end
             else
-                if (arNew >= 5)
+                if (arNew >= 2.3)
                     emotion = 'calm/content';
                 else
                     emotion = 'sad/depressed';
                 end
             end
-            fprintf('Valence and arousal analysis: %s\n', emotion)
+            fprintf('Valence and arousal analysis: %s,%f,%f\n', emotion,arNew,valNew)
             
             % Plot emotional state
             img = imread('emotion.png');
