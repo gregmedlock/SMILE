@@ -65,8 +65,8 @@ classdef EmotivSMILE < handle
         tempData;       % holds the data while it is being read from the library
         showDebug;
         learn;          % Pass true to constructor to turn on machine learning
-        posFreqs = java.util.TreeSet();
-        negFreqs = java.util.TreeSet();
+        posFreqs = java.util.TreeSet;
+        negFreqs = java.util.TreeSet;
         emotionFreqs = [167, 193, 157, 208, 244, 293, 294, 335, 388, 415,... 
             418, 135, 151, 159, 161, 163, 181, 183, 189, 150, 170, 199,...
             226, 234, 239, 245, 255, 260, 262, 268, 270, 273, 280, 281,...
@@ -80,7 +80,8 @@ classdef EmotivSMILE < handle
             self.showDebug = false;
             self.DataChannels = self.EE_DataChannels_enum; % THIS MAY BE REDUNDANT
             self.channelCount = length(self.DataChannelsNames);
-            
+            import java.util.*
+            import java.lang.*
             % Check to see if library was already loaded
             if ~libisloaded('edk')    
                 [notfound,warnings] = loadlibrary('edk.dll','edk.h');                 %#ok<NASGU,ASGLU>
@@ -89,7 +90,7 @@ classdef EmotivSMILE < handle
                 disp('EDK library already loaded');
             end
             
-             % Success if value returned is 0 
+             % Success if value returned is 0
             if calllib('edk','EE_EngineConnect',int8([self.unitIdentifier 0]))
                 error(['An error occured when using EE_EngineConnect to connect to ',self.unitIdentifier])
             else
@@ -203,7 +204,8 @@ classdef EmotivSMILE < handle
                 
                 currentIndex = currentIndex + nSamplesTaken;                
                 
-                disp(['Recording... recieved  ,',num2str(currentIndex + 1), ' samples so far in' ,num2str(etime(clock,starttime)),' secs. Still waiting for ', num2str(remainingDesiredSampleCount),' of ', num2str(originalDesiredSampleCount),' samples']);
+                %disp(['Recording... recieved  ,',num2str(currentIndex + 1), ' samples so far in' ,num2str(etime(clock,starttime)),' secs. Still waiting for ', num2str(remainingDesiredSampleCount),' of ', num2str(originalDesiredSampleCount),' samples']);
+                disp(['Recording... ',num2str(etime(clock,starttime)),' s']);
                 pause(self.timerPeriod);
             end
             recordFilename = ['EEGlog',datestr(now,30),'.mat'];
@@ -278,7 +280,8 @@ classdef EmotivSMILE < handle
         end
 %% Our Methods
         % Run loop to collect and analyze data
-        function [result] = runSMILE(self)
+        function [result] = runSMILE(self, learn)
+            self.learn = learn;
 %             matlabpool local 2
 %             spmd
 %                 [notfound,warnings] = loadlibrary('edk.dll','edk.h');                 %#ok<NASGU,ASGLU>
@@ -302,7 +305,8 @@ classdef EmotivSMILE < handle
             
             % Channel indexes
             F3  = 6;
-            AF4 = 5; % AF4 - 17, F7 - 5, F3-6, 01-10,
+            AF4 = 5; % AF4 - 17, F7 - 5, F3-6, 
+            O1= 10;
             
             % time axis
             samples = size(prevData.recordData, 1);
@@ -311,7 +315,8 @@ classdef EmotivSMILE < handle
             % Extract channel vectors
             chanF3  = prevData.recordData(:, F3);
             chanAF4 = prevData.recordData(:, AF4);
-            
+            chanO1 = prevData.recordData(:, O1);
+            chanF3 = chanF3-chanO1; %******** experiment
             % Prepare frequency range of alpha and beta waves
             len   = size(chanF3, 1);     % Length of signal
             next2 = 2^nextpow2(len);     % Next power of 2 from length of y
@@ -319,12 +324,15 @@ classdef EmotivSMILE < handle
             a  = find(f == 8);
             ab = find(f == 12);
             b  = find(f == 30);
-            
+            A = a:ab;
+            B = ab:b;
             % Calculate FFT for each channel we are interested in
             fftF3   = fft(chanF3, next2) / len;
             fftAF4  = fft(chanAF4, next2) / len;
-            magF3   = 2 * abs(fftF3(1 : next2 / 2 + 1));
-            magAF4  = 2 * abs(fftAF4(1 : next2 / 2 + 1));
+            fftO1 = fft(chanO1,next2) / len;
+            magF3   =  10*log10(abs(fftF3(1 : next2 / 2 + 1)));
+            magAF4  =  10*log10(abs(fftAF4(1 : next2 / 2 + 1)));
+            magO1  =  10*log10(abs(fftO1(1 : next2 / 2 + 1)));
             alphaRQ = magF3(a:ab) ./ magAF4(a:ab);
             betaRQ  = magF3(ab:b) ./ magAF4(ab:b);
             
@@ -337,22 +345,22 @@ classdef EmotivSMILE < handle
             alphaSumAF4 = sum(magAF4(a:ab));
             betaSumF3  = sum(magF3(ab:b));
             betaSumAF4 = sum(magAF4(ab:b));
-            arNew  = betaSumF3 / alphaSumF3;
-            valNew = betaSumAF4 / alphaSumAF4;
-            if (valNew >= 2.3)
-                if (arNew >= 2.3)
+            arNew  = betaSumF3 / alphaSumF3
+            valNew = betaSumAF4 / alphaSumAF4
+            if (valNew >= 4.5)
+                if (arNew >= 4.5)
                     emotion = 'excited/happy';
                 else
                     emotion = 'angry/afraid';
                 end
             else
-                if (arNew >= 2.3)
+                if (arNew >= 4.5)
                     emotion = 'calm/content';
                 else
                     emotion = 'sad/depressed';
                 end
             end
-            fprintf('Valence and arousal analysis: %s,%f,%f\n', emotion,arNew,valNew)
+            fprintf('Valence and arousal analysis: %s\n', emotion)
             
             % Plot emotional state
             img = imread('emotion.png');
@@ -367,12 +375,15 @@ classdef EmotivSMILE < handle
             % Rudimentary machine learning
             if self.learn
                 % Find extraneous frequencies (as indexes)
-                alphaIndexes = [find(alphaRQ > mean(alphaRQ) * 5), find(alphaRQ < mean(alphaRQ) / 5)] + a;
-                betaIndexes  = [find(betaRQ > mean(betaRQ) * 5), find(betaRQ < mean(betaRQ) / 5)] + ab;
+                alphaIndexes = [f(alphaRQ > mean(alphaRQ) * 3), f(alphaRQ < mean(alphaRQ) / 3)];
+                betaIndexes  = [f(betaRQ > mean(betaRQ) * 3), f(betaRQ < mean(betaRQ) / 3)];
                 
                 % See which set contains more of the extraneous frequencies
                 posCount = 0;
                 negCount = 0;
+                alphaIndexes;
+                betaIndexes;
+                if ~isempty(alphaIndexes) || ~isempty(betaIndexes) 
                 for index = [alphaIndexes, betaIndexes]
                     if self.posFreqs.contains(index)
                         posCount = posCount + 1;
@@ -381,35 +392,37 @@ classdef EmotivSMILE < handle
                         negCount = negCount + 1;
                     end
                 end
+                end
+                
                 
                 % Case where they are the same (both zero common example)
                 if negCount == posCount
                     % Get user input
-                    feels = lower(input('Was your emotion more positive or negative? (p/n)\n'));
+                    feels = lower(input('Was your emotion more positive or negative? (p/n): ','s'));
                     while feels ~= 'p' && feels ~= 'n'
                         disp('Please answer p or n.');
-                        feels = lower(input('Was your emotion more positive or negative? (p/n)\n'));
+                        feels = lower(input('Was your emotion more positive or negative? (p/n): ','s'));
                     end
                     
                     % Assign extraneous frequencies to the appropriate list
                     for index = [alphaIndexes, betaIndexes]
                         if feels == 'p'
-                            self.posFreqs.add(index)
+                            self.posFreqs.add(index);
                         else
-                            self.negFreqs.add(index)
+                            self.negFreqs.add(index);
                         end
                     end
                 % Case where there is more positive than negaitve
                 elseif posCount > negCount
                     % Verify guessed feeling
-                    verifeels = lower(input('Were you feeling positive? (y/n)\n'));
-                    while verifeels ~= 'p' && verifeels ~= 'n'
+                    verifeels = lower(input('Were you feeling positive? (y/n): ','s'));
+                    while verifeels ~= 'y' && verifeels ~= 'n'
                         disp('Please answer y or n.');
-                        verifeels = lower(input('Were you feeling positive? (y/n)\n'));
+                        verifeels = lower(input('Were you feeling positive? (y/n): ','s'));
                     end
                     
                     % Remove frequencies if in wrong set, add to correct one.
-                    for index = [alphaIndex, betaIndex]
+                    for index = [alphaIndexes, betaIndexes]
                         if verifeels == 'y'
                             self.posFreqs.add(index);
                             self.negFreqs.remove(index);
@@ -421,14 +434,14 @@ classdef EmotivSMILE < handle
                  % Case where there is more negaitve than positive
                 else
                     % Verify guessed feeling
-                    verifeels = lower(input('Were you feeling negative? (y/n)\n'));
-                    while verifeels ~= 'p' && verifeels ~= 'n'
+                    verifeels = lower(input('Were you feeling negative? (y/n): ','s'));
+                    while verifeels ~= 'y' && verifeels ~= 'n'
                         disp('Please answer y or n.');
-                        verifeels = lower(input('Were you feeling negative? (y/n)\n'));
+                        verifeels = lower(input('Were you feeling negative? (y/n): ','s'));
                     end
                     
                     % Remove frequencies if in wrong set, add to correct one.
-                    for index = [alphaIndex, betaIndex]
+                    for index = [alphaIndexes, betaIndexes]
                         if verifeels == 'y'
                             self.posFreqs.remove(index);
                             self.negFreqs.add(index);
@@ -445,12 +458,12 @@ classdef EmotivSMILE < handle
             % Check for high frequencies
             for index = self.emotionFreqs
                 if index < ab
-                    if alphaRQ(index - a + 1) > 5 % say, 5 for a threshold for now
+                    if alphaRQ(index - a + 1) > 3 % say, 5 for a threshold for now
                         fprintf('User is experiencing stress/sadness. \n(ALPHA)\nFreq: %.3f\n', f(index))
                         result = result + 1;
                     end
                 else
-                    if betaRQ(index - ab + 1) > 5 % say, 5 for a threshold for now
+                    if betaRQ(index - ab + 1) > 3 % say, 5 for a threshold for now
                         fprintf('User is experiencing stress/sadness. \n(BETA)\nFreq: %.3f\n', f(index))
                         result = result + 1;
                     end
