@@ -321,17 +321,25 @@ classdef EmotivSMILE < handle
                         end
                     end
                 end
+            else
+                % Prepare HashMap of data
+                for i = 8 : self.bandSize : 30 - self.bandSize
+                    fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
+                    self.classifyData.put(fRange, ArrayList);
+                end
             end
             
-            result = [];
-            i = 1;
+%             result = [];
+%             i = 1;
+            running = true;
             figure(1), hold on
-            while i < 10
+            while running
                 lastFilename = self.Record(10);
-                result(i) = self.analyzeData(lastFilename);
-                i = i + 1;
+                running = self.analyzeData(lastFilename);
+%                 i = i + 1;
             end
             hold off
+%             disp(result);
             
             % Write learned data to an excel file
             measures = self.responses.size();
@@ -355,55 +363,58 @@ classdef EmotivSMILE < handle
         
 %% analyzeData
         % Analyze data with FFT and look for certain frequencies
-        function [result] = analyzeData(self, lastFilename)
+        function [running] = analyzeData(self, lastFilename)
             % load data
             prevData = load(lastFilename);
             
             % Channel indexes
-            F3  = 6;
-            AF4 = 5; % AF4 - 17, F7 - 5, F3-6, 
-            O1= 10;
+            % F7 = 5 | F3 = 6 | O1 = 10 | AF4 = 17
+            left   = 6;
+            right  = 5;
+            center = 10;
             
-            % time axis
+            % Time axis
             samples = size(prevData.recordData, 1);
-            t = 10 / samples : 10 / samples : 10;
+            t = 10/samples : 10/samples : 10;
             
             % Extract channel vectors
-            chanF3  = prevData.recordData(:, F3);
-            chanAF4 = prevData.recordData(:, AF4);
-            chanO1 = prevData.recordData(:, O1);
-            chanF3 = chanF3-chanO1; %******** experiment
+            chanL = prevData.recordData(:, left);
+            chanR = prevData.recordData(:, right);
+            chanC = prevData.recordData(:, center);
+%             chanL = chanL - chanC; %******** experiment
+            
             % Prepare frequency range of alpha and beta waves
-            len   = size(chanF3, 1);     % Length of signal
-            next2 = 2^nextpow2(len);     % Next power of 2 from length of y
+            len   = size(chanL, 1);         % Length of signal
+            next2 = 2^nextpow2(len);        % Next power of 2 from length of y
             f  = self.sampFreq / 2 * linspace(0, 1, next2 / 2 + 1)';
             a  = find(f == 8);
             ab = find(f == 12);
             b  = find(f == 30);
-            A = a:ab;
-            B = ab:b;
+            
             % Calculate FFT for each channel we are interested in
-            fftF3   = fft(chanF3, next2) / len;
-            fftAF4  = fft(chanAF4, next2) / len;
-            fftO1   = fft(chanO1,next2) / len;
-            magF3   =  10*log10(abs(fftF3(1 : next2 / 2 + 1)));
-            magAF4  =  10*log10(abs(fftAF4(1 : next2 / 2 + 1)));
-            magO1   =  10*log10(abs(fftO1(1 : next2 / 2 + 1)));
-            alphaRQ = magF3(a:ab) ./ magAF4(a:ab);
-            betaRQ  = magF3(ab:b) ./ magAF4(ab:b);
+            fftL = fft(chanL, next2) / len;
+            fftR = fft(chanR, next2) / len;
+            fftC = fft(chanC,next2) / len;
+            magL =  10*log10(abs(fftL(1 : next2 / 2 + 1)));
+            magR =  10*log10(abs(fftR(1 : next2 / 2 + 1)));
+            magC =  10*log10(abs(fftC(1 : next2 / 2 + 1)));
+            
+            % Find relative quantitites, each L and R channel is adjusted by C first
+            alphaRQ = (magL(a:ab) - magC(a:ab)) ./ (magR(a:ab) - magC(a:ab));
+            betaRQ  = (magL(ab:b) - magC(ab:b)) ./ (magR(ab:b) - magC(ab:b));
             RQ = [alphaRQ, betaRQ]; % might not be right orientation -- to fix make semicolon
             
             % Plot raw data on left and magnitude spectrum (happy / sad) on right
-            subplot(1, 3, 1), plot(t, chanF3, t, chanAF4), legend('F3', 'AF4')
+            subplot(1, 3, 1), plot(t, chanL, t, chanR), legend('Left', 'Right')
             subplot(1, 3, 2), plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), legend('Alpha', 'Beta')
             
             % Valence and arousal
-            alphaSumF3  = sum(magF3(a:ab));
-            alphaSumAF4 = sum(magAF4(a:ab));
-            betaSumF3  = sum(magF3(ab:b));
-            betaSumAF4 = sum(magAF4(ab:b));
-            arNew  = betaSumF3 / alphaSumF3
-            valNew = betaSumAF4 / alphaSumAF4
+            alphaSumL = sum(magL(a:ab));
+            alphaSumR = sum(magR(a:ab));
+            betaSumL  = sum(magL(ab:b));
+            betaSumR  = sum(magR(ab:b));
+            arNew  = betaSumL / alphaSumL;
+            valNew = betaSumR / alphaSumR;
             if (valNew >= 4.5)
                 if (arNew >= 4.5)
                     emotion = 'excited/happy';
@@ -430,8 +441,10 @@ classdef EmotivSMILE < handle
             set(hline,'Color','r')
             
             % Machine learning with a classification-based decision tree. If learning is on, then
-            % data is added for analysis. When the runSMILE method ends, the data is stored in an
-            % excel file, that can later be recalled.
+            % the user is probed for their emotional state. When learning is off, the program tries
+            % to predict emotional state. User input is added to data fields. When the runSMILE 
+            % method ends, the new data is used to update the dicision tree. In addition, the data
+            % is stored in an excel file, which can later be recalled.
             if self.learn
                 % Get user input
                 feels = lower(input('Was your emotion more positive or negative? (p/n/q=quit): ','s'));
@@ -439,30 +452,7 @@ classdef EmotivSMILE < handle
                     disp('Please answer p, n, or q.');
                     feels = lower(input('Was your emotion more positive or negative? (p/n/q=quit): ','s'));
                 end
-                
-                % Prepare HashMap of data
-                for i = 8 : self.bandSize : 30 - self.bandSize
-                    fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
-                    self.classifyData.put(fRange, ArrayList);
-                end
-                
-                % Classify data -- currently averages each 1 Hz frequency band in alpha and beta
-                % ranges. Can make finer resolution if we wish.
-                if feels ~= 'q'
-                    if feels == 'p'
-                        self.responses.add('positive');
-                    else
-                        self.responses.add('negative');
-                    end
-                    for i = 8 : self.bandSize : 30 - self.bandSize
-                        low = find(f == i) - a + 1;
-                        high = find(f == i + 1) - a;
-                        bandAvg = mean(RQ(low : high));
-                        fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
-                        self.classifyData.get(fRange).add(bandAvg)
-                    end
-                end
-            else % only predict data if not learning
+            else % Only predict data if not "learning"
                 bandAvg = zeros(1, 22 / self.bandSize - 1);
                 index = 0;
                 for i = 8 : self.bandSize : 30 - self.bandSize
@@ -472,110 +462,52 @@ classdef EmotivSMILE < handle
                     bandAvg(index) = mean(RQ(low : high));
                 end
                 prediction = predict(self.ctree, bandAvg);
-                fprintf('Prediction: you are feeling %s\n', prediction);
-            end
-            
-%             % Rudimentary machine learning
-%             if self.learn
-%                 % Find extraneous frequencies (as indexes)
-%                 alphaIndexes = [f(alphaRQ > mean(alphaRQ) * 3), f(alphaRQ < mean(alphaRQ) / 3)];
-%                 betaIndexes  = [f(betaRQ > mean(betaRQ) * 3), f(betaRQ < mean(betaRQ) / 3)];
-%                 
-%                 % See which set contains more of the extraneous frequencies
-%                 posCount = 0;
-%                 negCount = 0;
-%                 alphaIndexes;
-%                 betaIndexes;
-%                 if ~isempty(alphaIndexes) || ~isempty(betaIndexes) 
-%                 for index = [alphaIndexes, betaIndexes]
-%                     if self.posFreqs.contains(index)
-%                         posCount = posCount + 1;
-%                     end
-%                     if self.negFreqs.contains(index)
-%                         negCount = negCount + 1;
-%                     end
-%                 end
-%                 end
-%                 
-%                 
-%                 % Case where they are the same (both zero common example)
-%                 if negCount == posCount
-%                     % Get user input
-%                     feels = lower(input('Was your emotion more positive or negative? (p/n): ','s'));
-%                     while feels ~= 'p' && feels ~= 'n'
-%                         disp('Please answer p or n.');
-%                         feels = lower(input('Was your emotion more positive or negative? (p/n): ','s'));
-%                     end
-%                     
-%                     % Assign extraneous frequencies to the appropriate list
-%                     for index = [alphaIndexes, betaIndexes]
-%                         if feels == 'p'
-%                             self.posFreqs.add(index);
-%                         else
-%                             self.negFreqs.add(index);
-%                         end
-%                     end
-%                 % Case where there is more positive than negaitve
-%                 elseif posCount > negCount
-%                     % Verify guessed feeling
-%                     verifeels = lower(input('Were you feeling positive? (y/n): ','s'));
-%                     while verifeels ~= 'y' && verifeels ~= 'n'
-%                         disp('Please answer y or n.');
-%                         verifeels = lower(input('Were you feeling positive? (y/n): ','s'));
-%                     end
-%                     
-%                     % Remove frequencies if in wrong set, add to correct one.
-%                     for index = [alphaIndexes, betaIndexes]
-%                         if verifeels == 'y'
-%                             self.posFreqs.add(index);
-%                             self.negFreqs.remove(index);
-%                         else
-%                             self.posFreqs.remove(index);
-%                             self.negFreqs.add(index);
-%                         end
-%                     end
-%                  % Case where there is more negaitve than positive
-%                 else
-%                     % Verify guessed feeling
-%                     verifeels = lower(input('Were you feeling negative? (y/n): ','s'));
-%                     while verifeels ~= 'y' && verifeels ~= 'n'
-%                         disp('Please answer y or n.');
-%                         verifeels = lower(input('Were you feeling negative? (y/n): ','s'));
-%                     end
-%                     
-%                     % Remove frequencies if in wrong set, add to correct one.
-%                     for index = [alphaIndexes, betaIndexes]
-%                         if verifeels == 'y'
-%                             self.posFreqs.remove(index);
-%                             self.negFreqs.add(index);
-%                         else
-%                             self.posFreqs.add(index);
-%                             self.negFreqs.remove(index);
-%                         end
-%                     end
-%                 end
-%             end
-            
-            
-            result = 0; %counter used for # of significant frequencies
-            % Check for high frequencies
-            for index = self.emotionFreqs
-                if index < ab
-                    if alphaRQ(index - a + 1) > 3 % say, 5 for a threshold for now
-                        fprintf('User is experiencing stress/sadness. \n(ALPHA)\nFreq: %.3f\n', f(index))
-                        result = result + 1;
+                fprintf('Prediction: you are feeling more %s right now\n', prediction);
+                
+                % Get user feedback (note: will not affect predictions immediately, must rerun
+                % runSMILE in order for feedback to take effect currently
+                vfeels = lower(input('Is this prediction correct? (y/n/q=quit): ','s'));
+                while vfeels ~= 'y' && vfeels ~= 'n' && vfeels ~= 'q'
+                    disp('Please answer y, n, or q.');
+                    vfeels = lower(input('Is this prediction correct? (y/n/q=quit): ','s'));
+                end
+                
+                % Match feedback
+                if vfeels == 'y'
+                    if strcmp(prediction, 'positive') % I think thats what it will say, we'll see
+                        feels = 'p';
+                    else
+                        feels = 'n';
                     end
                 else
-                    if betaRQ(index - ab + 1) > 3 % say, 5 for a threshold for now
-                        fprintf('User is experiencing stress/sadness. \n(BETA)\nFreq: %.3f\n', f(index))
-                        result = result + 1;
+                    if strcmp(prediction, 'positive')
+                        feels = 'n';
+                    else
+                        feels = 'y';
                     end
                 end
+            end
+            
+            % Classify data -- currently averages each 1 Hz frequency band in alpha and beta
+            % ranges. Can make finer resolution if we wish.
+            if feels == 'q'
+                running = false;
+            elseif feels == 'p'
+                self.responses.add('positive');
+            else
+                self.responses.add('negative');
+            end
+            for i = 8 : self.bandSize : 30 - self.bandSize
+                low = find(f == i) - a + 1;
+                high = find(f == i + 1) - a;
+                bandAvg = mean(RQ(low : high));
+                fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
+                self.classifyData.get(fRange).add(bandAvg)
             end
         end
         
 %% viewTree
-        % Simple visualization of the classification tree
+        % Simple visualization of the current classification tree
         function [] = viewTree(self)
             view(self.ctree, 'mode', 'graph')
         end
