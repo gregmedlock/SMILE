@@ -472,7 +472,7 @@ classdef EmotivSMILE < handle
                     bandAvg(index) = mean(RQ(low : high));
                 end
                 prediction = predict(self.ctree, bandAvg);
-                fprintf('Prediction: you are feeling %s\n', prediction);
+                disp
             end
             
 %             % Rudimentary machine learning
