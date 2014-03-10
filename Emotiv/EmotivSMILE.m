@@ -68,8 +68,8 @@ classdef EmotivSMILE < handle
 %         posFreqs = TreeSet;
 %         negFreqs = TreeSet;
         ctree;                  % Classification tree
-        responses = ArrayList;  % List of responses from machine learning
-        classifyData = HashMap; % Data for machine learning mapped to the frequency range taken at
+        responses = java.util.ArrayList;  % List of responses from machine learning
+        classifyData = java.util.HashMap(); % Data for machine learning mapped to the frequency range taken at
         bandSize = 1;
         emotionFreqs = [167, 193, 157, 208, 244, 293, 294, 335, 388, 415,... 
             418, 135, 151, 159, 161, 163, 181, 183, 189, 150, 170, 199,...
@@ -288,44 +288,43 @@ classdef EmotivSMILE < handle
             validateattributes(learn, {'logical'}, {}, mfilename, 'learn', 1)
             self.learn = learn;
             
-            if ~learn
+            % Ask to import old data
+            icanhaz = lower(input('Would you like to import previous learning data? (y/n): ','s'));
+            while icanhaz ~= 'y' && icanhaz ~= 'n'
+                disp('Please answer y or n.');
                 icanhaz = lower(input('Would you like to import previous learning data? (y/n): ','s'));
-                while icanhaz ~= 'y' && icanhaz ~= 'n'
-                    disp('Please answer y or n.');
-                    icanhaz = lower(input('Would you like to import previous learning data? (y/n): ','s'));
-                end
-                % something something not any data but no import idiot client
+            end
+            % something something not any data but no import idiot client
+
+            % Import old data and write to data structures in class, overwriting current data
+            if icanhaz == 'y'
+                % Import data
+                [oldData, oldResponses] = xlsread('classification.xlsx');
+                self.bandSize = 22 / numel(oldResponses);
                 
-                % Import old data and write to data structures in class, overwriting current data
-                if icanhaz == 'y'
-                    % Import data
-                    [oldResponses, oldData] = xlsread('classification.xlsx');
-                    self.bandSize = 22 / (size(oldData, 2) + 1);
-                    
-                    % Reset data structures
-                    self.responses.clear();
-                    self.classifyData.clear();
-                    for i = 8 : self.bandSize : 30 - self.bandSize
-                        fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
-                        self.classifyData.put(fRange, ArrayList);
-                    end
-                    
-                    % Add data
-                    for i = 1:numel(oldRespones)
-                        index = 0;
-                        self.responses.add(oldResponses{i});
-                        for j = 8 : self.bandSize : 30 - self.bandSize
-                            index = index + 1;
-                            fRange = sprintf('%.1f - %.1f Hz', j, j + self.bandSize);
-                            self.classifyData.get(fRange).add(oldData{index, i});
-                        end
+                % Reset data structures
+                self.responses.clear();
+                self.classifyData.clear();
+                for i = 8 : self.bandSize : 30 - self.bandSize
+                    fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
+                    self.classifyData.put(fRange, java.util.ArrayList);
+                end
+                
+                % Add data
+                for i = 1:numel(oldResponses)
+                    index = 0;
+                    self.responses.add(oldResponses{i});
+                    for j = 8 : self.bandSize : 30 - self.bandSize
+                        index = index + 1;
+                        fRange = sprintf('%.1f - %.1f Hz', j, j + self.bandSize);
+                        self.classifyData.get(fRange).add(oldData(i, index));
                     end
                 end
             else
                 % Prepare HashMap of data
                 for i = 8 : self.bandSize : 30 - self.bandSize
                     fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
-                    self.classifyData.put(fRange, ArrayList);
+                    self.classifyData.put(fRange, java.util.ArrayList);
                 end
             end
             
@@ -343,22 +342,35 @@ classdef EmotivSMILE < handle
             
             % Write learned data to an excel file
             measures = self.responses.size();
+            %respCell = cell(1, measures);
             respCell = cell(measures, 1);
             dataCell = cell(measures, length(8:self.bandSize:29));
+            %dataCell = cell(length(8:self.bandSize:29),measures);
+            length(8:self.bandSize:29)
             for i = 1:measures
                 index = 0;
-                respCell{i} = self.responses.get(i);
+                respCell{i} = self.responses.get(i - 1);
                 for j = 8:self.bandSize:29
                     index = index + 1;
                     fRange = sprintf('%.1f - %.1f Hz', j, j + self.bandSize);
-                    dataCell{index, i} = self.classifyData.get(fRange).get(i);
+                    dataCell{i, index} = self.classifyData.get(fRange).get(i - 1);
                 end
+                
             end
+            
             fullCell = [respCell, dataCell];
+            if exist('classification.xlsx','file')
+                delete('classification.xlsx');
+            end
+            save('fullCell.mat', 'fullCell');
             xlswrite('classification.xlsx', fullCell)
             
             % Create classification tree for most recent data
-            self.ctree = fitctree(respCell, dataCell);
+            %self.ctree = fitctree(respCell, dataCell);
+            %Categorical value vector must be in y for fit(x,y)
+            numData = cell2mat(dataCell);
+            self.ctree = ClassificationTree.fit(numData, respCell); %fitctree not present in MATLAB 2013a
+            %self.ctree = ClassificationTree.fit(respCell, dataCell); %fitctree not present in MATLAB 2013a
         end
         
 %% analyzeData
@@ -402,7 +414,7 @@ classdef EmotivSMILE < handle
             % Find relative quantitites, each L and R channel is adjusted by C first
             alphaRQ = (magL(a:ab) - magC(a:ab)) ./ (magR(a:ab) - magC(a:ab));
             betaRQ  = (magL(ab:b) - magC(ab:b)) ./ (magR(ab:b) - magC(ab:b));
-            RQ = [alphaRQ, betaRQ]; % might not be right orientation -- to fix make semicolon
+            RQ = [alphaRQ; betaRQ]; % might not be right orientation -- to fix make semicolon
             
             % Plot raw data on left and magnitude spectrum (happy / sad) on right
             subplot(1, 3, 1), plot(t, chanL, t, chanR), legend('Left', 'Right')
@@ -490,6 +502,7 @@ classdef EmotivSMILE < handle
             
             % Classify data -- currently averages each 1 Hz frequency band in alpha and beta
             % ranges. Can make finer resolution if we wish.
+            running = true;
             if feels == 'q'
                 running = false;
             elseif feels == 'p'
@@ -502,7 +515,7 @@ classdef EmotivSMILE < handle
                 high = find(f == i + 1) - a;
                 bandAvg = mean(RQ(low : high));
                 fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
-                self.classifyData.get(fRange).add(bandAvg)
+                self.classifyData.get(fRange).add(bandAvg);
             end
         end
         
