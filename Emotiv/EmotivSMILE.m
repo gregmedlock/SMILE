@@ -281,7 +281,7 @@ classdef EmotivSMILE < handle
         
 %% runSMILE
         % Run loop to collect and analyze data
-        function [result] = runSMILE(self, mode)
+        function [] = runSMILE(self, mode)
             % Check input
             mode = lower(mode);
             validatestring(mode, {'learn', 'test', 'demo'}, mfilename, 'learn', 1)
@@ -321,23 +321,26 @@ classdef EmotivSMILE < handle
                 end
             else
                 % Prepare HashMap of data
+                self.responses.clear();
+                self.classifyData.clear();
                 for i = 8 : self.bandSize : 30 - self.bandSize
                     fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
                     self.classifyData.put(fRange, java.util.ArrayList);
                 end
             end
             
-            try
+%             try
                 running = true;
                 figure(1), hold on
                 while running
                     lastFilename = self.Record(10);
+                    disp('before')
                     running = self.analyzeData(lastFilename, mode);
-    %                 i = i + 1;
+                    disp('after')
                 end
                 hold off
-            catch
-            end
+%             catch
+%             end
             
             % Write learned data to an excel file
             measures = self.responses.size();
@@ -345,7 +348,6 @@ classdef EmotivSMILE < handle
             respCell = cell(measures, 1);
             dataCell = cell(measures, length(8:self.bandSize:29));
             %dataCell = cell(length(8:self.bandSize:29),measures);
-            length(8:self.bandSize:29)
             for i = 1:measures
                 index = 0;
                 respCell{i} = self.responses.get(i - 1);
@@ -365,7 +367,7 @@ classdef EmotivSMILE < handle
             xlswrite('classification.xlsx', fullCell)
             
             numData = cell2mat(dataCell);
-            predictors = 22 / self.bandSize;
+            predictors = cell(22 / self.bandSize, 1);
             for i = 8 : self.bandSize : 30 - self.bandSize
                 predictors{i - 7} = sprintf('%d Hz', i);
             end
@@ -376,12 +378,13 @@ classdef EmotivSMILE < handle
 %% analyzeData
         % Analyze data with FFT and look for certain frequencies
         function [running] = analyzeData(self, lastFilename, mode)
+            disp('inside start')
             % load data
             prevData = load(lastFilename);
             
             % Channel indexes
-            % F7 = 5 | F3 = 6 | O1 = 10 | AF4 = 17
-            left   = 17;
+            % F7 = 5 | F3 = 6 | O1 = 10 | F4 = 14 | AF4 = 17
+            left   = 15;
             right  = 5;
             center = 10;
             
@@ -407,9 +410,9 @@ classdef EmotivSMILE < handle
             fftL = fft(chanL, next2) / len;
             fftR = fft(chanR, next2) / len;
             fftC = fft(chanC,next2) / len;
-            magL =  10*log10(abs(fftL(1 : next2 / 2 + 1)));
-            magR =  10*log10(abs(fftR(1 : next2 / 2 + 1)));
-            magC =  10*log10(abs(fftC(1 : next2 / 2 + 1)));
+            magL = 10*log10(abs(fftL(1 : next2 / 2 + 1)));
+            magR = 10*log10(abs(fftR(1 : next2 / 2 + 1)));
+            magC = 10*log10(abs(fftC(1 : next2 / 2 + 1)));
             
             % Find relative quantitites, each L and R channel is adjusted by C first
             alphaRQ = (magL(a:ab) - magC(a:ab)) ./ (magR(a:ab) - magC(a:ab));
