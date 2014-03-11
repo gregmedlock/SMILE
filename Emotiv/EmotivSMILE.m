@@ -64,7 +64,6 @@ classdef EmotivSMILE < handle
     properties (SetAccess = private)
         tempData;               % holds the data while it is being read from the library
         showDebug;              % makes more show up when taking data
-        learn;                  % Pass true to constructor to turn on machine learning
 %         posFreqs = TreeSet;
 %         negFreqs = TreeSet;
         ctree;                  % Classification tree
@@ -83,8 +82,6 @@ classdef EmotivSMILE < handle
             self.showDebug = false;
             self.DataChannels = self.EE_DataChannels_enum; % THIS MAY BE REDUNDANT
             self.channelCount = length(self.DataChannelsNames);
-            import java.util.*
-            import java.lang.*
             % Check to see if library was already loaded
             if ~libisloaded('edk')    
                 [notfound,warnings] = loadlibrary('edk.dll','edk.h');                 %#ok<NASGU,ASGLU>
@@ -284,9 +281,10 @@ classdef EmotivSMILE < handle
         
 %% runSMILE
         % Run loop to collect and analyze data
-        function [result] = runSMILE(self, learn)
-            validateattributes(learn, {'logical'}, {}, mfilename, 'learn', 1)
-            self.learn = learn;
+        function [result] = runSMILE(self, mode)
+            % Check input
+            mode = lower(mode);
+            validatestring(mode, {'learn', 'test', 'demo'}, mfilename, 'learn', 1)
             
             % Ask to import old data
             icanhaz = lower(input('Would you like to import previous learning data? (y/n): ','s'));
@@ -295,12 +293,13 @@ classdef EmotivSMILE < handle
                 icanhaz = lower(input('Would you like to import previous learning data? (y/n): ','s'));
             end
             % something something not any data but no import idiot client
-
+            
             % Import old data and write to data structures in class, overwriting current data
             if icanhaz == 'y'
                 % Import data
                 [oldData, oldResponses] = xlsread('classification.xlsx');
-                self.bandSize = 22 / numel(oldResponses);
+                self.bandSize = 22 / size(oldData, 2);
+                self.ctree = ClassificationTree.fit(oldData, oldResponses);
                 
                 % Reset data structures
                 self.responses.clear();
@@ -328,17 +327,17 @@ classdef EmotivSMILE < handle
                 end
             end
             
-%             result = [];
-%             i = 1;
-            running = true;
-            figure(1), hold on
-            while running
-                lastFilename = self.Record(10);
-                running = self.analyzeData(lastFilename);
-%                 i = i + 1;
+            try
+                running = true;
+                figure(1), hold on
+                while running
+                    lastFilename = self.Record(10);
+                    running = self.analyzeData(lastFilename, mode);
+    %                 i = i + 1;
+                end
+                hold off
+            catch
             end
-            hold off
-%             disp(result);
             
             % Write learned data to an excel file
             measures = self.responses.size();
@@ -365,23 +364,24 @@ classdef EmotivSMILE < handle
             save('fullCell.mat', 'fullCell');
             xlswrite('classification.xlsx', fullCell)
             
-            % Create classification tree for most recent data
-            %self.ctree = fitctree(respCell, dataCell);
-            %Categorical value vector must be in y for fit(x,y)
             numData = cell2mat(dataCell);
-            self.ctree = ClassificationTree.fit(numData, respCell); %fitctree not present in MATLAB 2013a
-            %self.ctree = ClassificationTree.fit(respCell, dataCell); %fitctree not present in MATLAB 2013a
+            predictors = 22 / self.bandSize;
+            for i = 8 : self.bandSize : 30 - self.bandSize
+                predictors{i - 7} = sprintf('%d Hz', i);
+            end
+            self.ctree = ClassificationTree.fit(numData, respCell, 'PredictorNames', predictors);
+            self.viewTree();
         end
         
 %% analyzeData
         % Analyze data with FFT and look for certain frequencies
-        function [running] = analyzeData(self, lastFilename)
+        function [running] = analyzeData(self, lastFilename, mode)
             % load data
             prevData = load(lastFilename);
             
             % Channel indexes
             % F7 = 5 | F3 = 6 | O1 = 10 | AF4 = 17
-            left   = 6;
+            left   = 17;
             right  = 5;
             center = 10;
             
@@ -417,8 +417,8 @@ classdef EmotivSMILE < handle
             RQ = [alphaRQ; betaRQ]; % might not be right orientation -- to fix make semicolon
             
             % Plot raw data on left and magnitude spectrum (happy / sad) on right
-            subplot(1, 3, 1), plot(t, chanL, t, chanR), legend('Left', 'Right')
-            subplot(1, 3, 2), plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), legend('Alpha', 'Beta')
+            subplot(1, 2, 1), plot(t, chanL, t, chanR), legend('Left', 'Right')
+            subplot(1, 2, 2), plot(f(a:ab), alphaRQ, f(ab:b), betaRQ), legend('Alpha', 'Beta')
             
             % Valence and arousal
             alphaSumL = sum(magL(a:ab));
@@ -442,29 +442,29 @@ classdef EmotivSMILE < handle
             end
             fprintf('Valence and arousal analysis: %s\n', emotion)
             
-            % Plot emotional state
-            img = imread('emotion.png');
-            subplot(1,3,3), hold on
-            imagesc([0 10],[0 10], flipdim(img,1));
-            plot(arNew, valNew, 'bo', 'MarkerSize', 12);
-            set(gca, 'ydir', 'normal');
-            axis([0 10 0 10]);
-            hline = refline([0 5]);
-            set(hline,'Color','r')
+%             % Plot emotional state
+%             img = imread('emotion.png');
+%             subplot(1,3,3), hold on
+%             imagesc([0 10],[0 10], flipdim(img,1));
+%             plot(arNew, valNew, 'bo', 'MarkerSize', 12);
+%             set(gca, 'ydir', 'normal');
+%             axis([0 10 0 10]);
+%             hline = refline([0 5]);
+%             set(hline,'Color','r')
             
             % Machine learning with a classification-based decision tree. If learning is on, then
             % the user is probed for their emotional state. When learning is off, the program tries
             % to predict emotional state. User input is added to data fields. When the runSMILE 
             % method ends, the new data is used to update the dicision tree. In addition, the data
             % is stored in an excel file, which can later be recalled.
-            if self.learn
-                % Get user input
+            
+            if strcmp(mode, 'learn') % Learning mode: collect data
                 feels = lower(input('Was your emotion more positive or negative? (p/n/q=quit): ','s'));
-                while feels ~= 'p' && feels ~= 'n' && feels ~= 'q'
+                while ~strfind('pnq', feels)
                     disp('Please answer p, n, or q.');
                     feels = lower(input('Was your emotion more positive or negative? (p/n/q=quit): ','s'));
                 end
-            else % Only predict data if not "learning"
+            else % Make a prediction
                 bandAvg = zeros(1, 22 / self.bandSize - 1);
                 index = 0;
                 for i = 8 : self.bandSize : 30 - self.bandSize
@@ -474,16 +474,17 @@ classdef EmotivSMILE < handle
                     bandAvg(index) = mean(RQ(low : high));
                 end
                 prediction = predict(self.ctree, bandAvg);
-                fprintf('Prediction: you are feeling more %s right now\n', prediction);
-                
-                % Get user feedback (note: will not affect predictions immediately, must rerun
+                fprintf('Prediction: you are feeling more %s right now\n', prediction{:});
+            end
+            if strcmp(mode, 'test') % Get user feedback in testing mode
+                % Note: will not affect predictions immediately, must rerun
                 % runSMILE in order for feedback to take effect currently
                 vfeels = lower(input('Is this prediction correct? (y/n/q=quit): ','s'));
-                while vfeels ~= 'y' && vfeels ~= 'n' && vfeels ~= 'q'
+                while ~strfind('ynq', vfeels)
                     disp('Please answer y, n, or q.');
                     vfeels = lower(input('Is this prediction correct? (y/n/q=quit): ','s'));
                 end
-                
+
                 % Match feedback
                 if vfeels == 'y'
                     if strcmp(prediction, 'positive') % I think thats what it will say, we'll see
@@ -491,31 +492,34 @@ classdef EmotivSMILE < handle
                     else
                         feels = 'n';
                     end
-                else
+                elseif vfeels == 'n'
                     if strcmp(prediction, 'positive')
                         feels = 'n';
                     else
                         feels = 'y';
                     end
+                else
+                    feels = 'q';
                 end
             end
-            
-            % Classify data -- currently averages each 1 Hz frequency band in alpha and beta
-            % ranges. Can make finer resolution if we wish.
-            running = true;
-            if feels == 'q'
-                running = false;
-            elseif feels == 'p'
-                self.responses.add('positive');
-            else
-                self.responses.add('negative');
-            end
-            for i = 8 : self.bandSize : 30 - self.bandSize
-                low = find(f == i) - a + 1;
-                high = find(f == i + 1) - a;
-                bandAvg = mean(RQ(low : high));
-                fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
-                self.classifyData.get(fRange).add(bandAvg);
+            if strcmp(mode, 'learn') || strcmp(mode, 'test') % Classify data
+                % Currently averages each 1 Hz frequency band in alpha and beta
+                % ranges. Can make finer resolution if we wish.
+                running = true;
+                if feels == 'q'
+                    running = false;
+                elseif feels == 'p'
+                    self.responses.add('positive');
+                else
+                    self.responses.add('negative');
+                end
+                for i = 8 : self.bandSize : 30 - self.bandSize
+                    low = find(f == i) - a + 1;
+                    high = find(f == i + 1) - a;
+                    bandAvg = mean(RQ(low : high));
+                    fRange = sprintf('%.1f - %.1f Hz', i, i + self.bandSize);
+                    self.classifyData.get(fRange).add(bandAvg);
+                end
             end
         end
         
