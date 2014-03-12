@@ -334,9 +334,7 @@ classdef EmotivSMILE < handle
                 figure(1), hold on
                 while running
                     lastFilename = self.Record(10);
-                    disp('before')
                     running = self.analyzeData(lastFilename, mode);
-                    disp('after')
                 end
                 hold off
 %             catch
@@ -378,13 +376,12 @@ classdef EmotivSMILE < handle
 %% analyzeData
         % Analyze data with FFT and look for certain frequencies
         function [running] = analyzeData(self, lastFilename, mode)
-            disp('inside start')
             % load data
             prevData = load(lastFilename);
             
             % Channel indexes
             % F7 = 5 | F3 = 6 | O1 = 10 | F4 = 14 | AF4 = 17
-            left   = 15;
+            left   = 6;
             right  = 5;
             center = 10;
             
