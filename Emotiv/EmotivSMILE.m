@@ -64,11 +64,10 @@ classdef EmotivSMILE < handle
     properties (SetAccess = private)
         tempData;               % holds the data while it is being read from the library
         showDebug;              % makes more show up when taking data
-%         posFreqs = TreeSet;
-%         negFreqs = TreeSet;
         ctree;                  % Classification tree
-        responses = java.util.ArrayList;  % List of responses from machine learning
-        classifyData = java.util.HashMap(); % Data for machine learning mapped to the frequency range taken at
+        demoResults = java.util.ArrayList();    % List of predictions during the demo mode
+        responses = java.util.ArrayList();      % List of responses from machine learning
+        classifyData = java.util.HashMap();     % Data for machine learning mapped to the frequency range taken at
         bandSize = 1;
         emotionFreqs = [167, 193, 157, 208, 244, 293, 294, 335, 388, 415,... 
             418, 135, 151, 159, 161, 163, 181, 183, 189, 150, 170, 199,...
@@ -284,7 +283,7 @@ classdef EmotivSMILE < handle
         function [] = runSMILE(self, mode)
             % Check input
             mode = lower(mode);
-            validatestring(mode, {'learn', 'test', 'demo'}, mfilename, 'learn', 1)
+            validatestring(mode, {'learn', 'test', 'run','demo'}, mfilename, 'mode', 1)
             
             % Ask to import old data
             icanhaz = lower(input('Would you like to import previous learning data? (y/n): ','s'));
@@ -292,12 +291,12 @@ classdef EmotivSMILE < handle
                 disp('Please answer y or n.');
                 icanhaz = lower(input('Would you like to import previous learning data? (y/n): ','s'));
             end
-            % something something not any data but no import idiot client
             
             % Import old data and write to data structures in class, overwriting current data
             if icanhaz == 'y'
                 % Import data
-                [oldData, oldResponses] = xlsread('classification.xlsx');
+                [filename, pathname] = uigetfile('*.xlsx', 'Pick a previous data file');
+                [oldData, oldResponses] = xlsread(fullfile(pathname, filename));
                 self.bandSize = 22 / size(oldData, 2);
                 self.ctree = ClassificationTree.fit(oldData, oldResponses);
                 
@@ -329,48 +328,46 @@ classdef EmotivSMILE < handle
                 end
             end
             
-%             try
-                running = true;
-                figure(1), hold on
-                while running
-                    lastFilename = self.Record(10);
-                    running = self.analyzeData(lastFilename, mode);
+%-----------% Execution loop
+            running = true;
+            figure(1), hold on
+            while running
+                lastFilename = self.Record(10);
+                running = self.analyzeData(lastFilename, mode);
+            end
+            hold off
+            
+            if strcmp(mode, 'learn') || strcmp(mode, 'test')
+                % Write learned data to an excel file
+                measures = self.responses.size();
+                respCell = cell(measures, 1);
+                dataCell = cell(measures, length(8:self.bandSize:29));
+                for i = 1:measures
+                    index = 0;
+                    respCell{i} = self.responses.get(i - 1);
+                    for j = 8:self.bandSize:29
+                        index = index + 1;
+                        fRange = sprintf('%.1f - %.1f Hz', j, j + self.bandSize);
+                        dataCell{i, index} = self.classifyData.get(fRange).get(i - 1);
+                    end
                 end
-                hold off
-%             catch
-%             end
-            
-            % Write learned data to an excel file
-            measures = self.responses.size();
-            %respCell = cell(1, measures);
-            respCell = cell(measures, 1);
-            dataCell = cell(measures, length(8:self.bandSize:29));
-            %dataCell = cell(length(8:self.bandSize:29),measures);
-            for i = 1:measures
-                index = 0;
-                respCell{i} = self.responses.get(i - 1);
-                for j = 8:self.bandSize:29
-                    index = index + 1;
-                    fRange = sprintf('%.1f - %.1f Hz', j, j + self.bandSize);
-                    dataCell{i, index} = self.classifyData.get(fRange).get(i - 1);
+                fullCell = [respCell, dataCell];
+                [filename, pathname] = uiputfile('*.xlsx', 'Save decision tree data to an excel file');
+                filepath = fullfile(pathname, filename);
+                if exist(filepath,'file')
+                    delete(filepath);
                 end
-                
+                xlswrite(filepath, fullCell);
+
+                % Create new classification tree
+                numData = cell2mat(dataCell);
+                predictors = cell(22 / self.bandSize, 1);
+                for i = 8 : self.bandSize : 30 - self.bandSize
+                    predictors{i - 7} = sprintf('%d Hz', i);
+                end
+                self.ctree = ClassificationTree.fit(numData, respCell, 'PredictorNames', predictors);
+                self.viewTree();
             end
-            
-            fullCell = [respCell, dataCell];
-            if exist('classification.xlsx','file')
-                delete('classification.xlsx');
-            end
-            save('fullCell.mat', 'fullCell');
-            xlswrite('classification.xlsx', fullCell)
-            
-            numData = cell2mat(dataCell);
-            predictors = cell(22 / self.bandSize, 1);
-            for i = 8 : self.bandSize : 30 - self.bandSize
-                predictors{i - 7} = sprintf('%d Hz', i);
-            end
-            self.ctree = ClassificationTree.fit(numData, respCell, 'PredictorNames', predictors);
-            self.viewTree();
         end
         
 %% analyzeData
@@ -393,7 +390,6 @@ classdef EmotivSMILE < handle
             chanL = prevData.recordData(:, left);
             chanR = prevData.recordData(:, right);
             chanC = prevData.recordData(:, center);
-%             chanL = chanL - chanC; %******** experiment
             
             % Prepare frequency range of alpha and beta waves
             len   = size(chanL, 1);         % Length of signal
@@ -414,7 +410,7 @@ classdef EmotivSMILE < handle
             % Find relative quantitites, each L and R channel is adjusted by C first
             alphaRQ = (magL(a:ab) - magC(a:ab)) ./ (magR(a:ab) - magC(a:ab));
             betaRQ  = (magL(ab:b) - magC(ab:b)) ./ (magR(ab:b) - magC(ab:b));
-            RQ = [alphaRQ; betaRQ]; % might not be right orientation -- to fix make semicolon
+            RQ = [alphaRQ; betaRQ];
             
             % Plot raw data on left and magnitude spectrum (happy / sad) on right
             subplot(1, 2, 1), plot(t, chanL, t, chanR), legend('Left', 'Right')
@@ -474,7 +470,12 @@ classdef EmotivSMILE < handle
                     bandAvg(index) = mean(RQ(low : high));
                 end
                 prediction = predict(self.ctree, bandAvg);
+            end
+            if strcmp(mode, 'test') || strcmp(mode, 'run') % Don't display prediction during demo
                 fprintf('Prediction: you are feeling more %s right now\n', prediction{:});
+            end
+            if strcmp(mode, 'demo')
+                self.demoResults.add(prediction);
             end
             if strcmp(mode, 'test') % Get user feedback in testing mode
                 % Note: will not affect predictions immediately, must rerun
