@@ -51,6 +51,8 @@ fprintf(['######################################################################
 
 pause()
 
+h.delete();
+h = EmotivSMILE();
 h.runSMILE('learn');
 h.delete();
 

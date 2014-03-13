@@ -4,9 +4,14 @@ clear all
 clc
 
 % Intro text
-fprintf(['This script will demonstrate the ability of SMILE to predict Greg''s mood as being\n'...
+fprintf(['##########################################################################################\n\n'...
+         'This script will demonstrate the ability of SMILE to predict Greg''s mood as being\n'...
          'positive, negative, or neutral.\n\n'...
-         'We have prepared by running our program with machine learning turned on,.'
+         'We have prepared by running our program with machine learning turned on. Our program\n'...
+         'allows users to save machine learning data and selectively reload it in any later\n'...
+         'session.\n\nPress any button to continue...\n\n']);
+
+pause()
 
 % Run demo
 h = EmotivSMILE();
@@ -39,5 +44,25 @@ h.veiwTree();
 %% Learning Demo
 close all
 
+h.delete();
+
+% Intro text
+fprintf(['##########################################################################################\n\n'...
+         'This script will demonstrate the machine learning of SMILE.\n\n'...
+         'Press any button to continue...\n\n']);
+
+pause()
+
 h.runSMILE('learn');
 h.delete();
+
+
+
+
+
+
+
+
+
+
+
