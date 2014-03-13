@@ -399,10 +399,11 @@ classdef EmotivSMILE < handle
             prevData = load(lastFilename);
             
             % Channel indexes
+            chan = self.EE_DataChannels_enum;
             % F7 = 5 | F3 = 6 | O1 = 10 | F4 = 14 | AF4 = 17
-            left   = 6;
-            right  = 5;
-            center = 10;
+            left   = chan.O1;
+            right  = chan.F7;
+            center = chan.F3;
             
             % Time axis
             samples = size(prevData.recordData, 1);
